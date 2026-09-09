@@ -3,7 +3,10 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 import { config } from './config/env.js';
+import { Environment } from './constants/environment.enum.js';
+import { HttpStatus } from './constants/http-status.enum.js';
 
 const app = express();
 
@@ -19,29 +22,31 @@ app.use(
 );
 
 // 3. Request Logging (Development only)
-if (config.NODE_ENV === 'development') {
+if (config.NODE_ENV === Environment.DEVELOPMENT) {
   app.use(morgan('dev'));
 }
 
 // 4. Request Body Parsing
-app.use(express.json({ limit: '10kb' })); // Limits payload to prevent DoS attacks
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
-import mongoose from 'mongoose';
-
 // 5. Health Check Endpoint
-app.get('/health', (_, res) => {
+app.get('/health', (_req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1;
 
   if (!isDbConnected) {
-    SendResponse(res, 503, false, 'Service Unavailable: Database connection is down', {
+    res.status(HttpStatus.SERVICE_UNAVAILABLE).json({
+      status: 'error',
+      message: 'Service Unavailable: Database connection is down',
       timestamp: new Date().toISOString(),
     });
     return;
   }
 
-  SendResponse(res, 200, true, 'Server is healthy', {
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: 'Server is healthy',
     timestamp: new Date().toISOString(),
   });
 });
@@ -55,7 +60,6 @@ app.use('/api/v1/dashboard', dashboardRouter);
 
 // 7. Global Error Handling Middleware (Must be registered last)
 import { globalErrorHandler } from './middleware/error.middleware.js';
-import SendResponse from './utils/response.js';
 app.use(globalErrorHandler);
 
 export default app;

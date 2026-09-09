@@ -1,11 +1,13 @@
 import type { Response, NextFunction } from 'express';
 import type { AuthenticatedRequest } from './auth.controller.js';
-import { AuthService } from '../services/auth.service.js';
+import { authService } from '../services/auth.service.js';
 import SendResponse from '../utils/response.js';
 import { AppError } from '../utils/appError.js';
+import { HttpStatus } from '../constants/http-status.enum.js';
+import { UserMapper } from '../mappers/user.mapper.js';
 
 /**
- * Retrieve welcome data for the authenticated user's dashboard.
+ * Controller: Retrieve dashboard data for authenticated user.
  */
 export const getDashboardData = async (
   req: AuthenticatedRequest,
@@ -14,23 +16,13 @@ export const getDashboardData = async (
 ): Promise<void> => {
   try {
     if (!req.user) {
-      throw new AppError('User not authenticated', 401);
+      throw new AppError('User not authenticated', HttpStatus.UNAUTHORIZED);
     }
 
-    // Load active user profile details
-    const user = await AuthService.getUserProfile(req.user.id);
+    const user = await authService.getUserProfile(req.user.id);
+    const dashboardDto = UserMapper.toDashboardDto(user);
 
-    // Return exact welcome payload properties required by UI pg 14
-    SendResponse(
-      res,
-      200,
-      true,
-      'Dashboard data retrieved successfully',
-      {
-        fullName: user.fullName,
-        username: user.username,
-      }
-    );
+    SendResponse(res, HttpStatus.OK, true, 'Dashboard data retrieved successfully', dashboardDto);
   } catch (err) {
     next(err);
   }

@@ -1,111 +1,89 @@
 import bcrypt from 'bcrypt';
-import { User, type IUserDocument } from '../models/user.js';
+import type { IUserDocument } from '../models/user.js';
 import { AppError } from '../utils/appError.js';
+import { HttpStatus } from '../constants/http-status.enum.js';
+import type { RegisterUserDto, LoginUserDto, TokenResultDto } from '../dtos/auth.dto.js';
+import { userRepository, type IUserRepository } from '../repositories/user.repository.js';
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
-  type TokenPayload
+  type TokenPayload,
 } from '../utils/jwt.js';
-
-interface RegisterInput {
-  fullName: string;
-  username: string;
-  password: string;
-}
-
-interface LoginInput {
-  username: string;
-  password: string;
-}
-
-interface TokenResult {
-  accessToken: string;
-  refreshToken: string;
-}
 
 /**
  * Authentication Business Logic Service.
- * Decouples controllers from direct Mongoose model operations.
+ * Decoupled from ORM implementation via the Repository Pattern.
  */
-export const AuthService = {
+export class AuthService {
+  constructor(private readonly userRepo: IUserRepository = userRepository) {}
+
   /**
-   * Registers a new user.
-   * Throws an AppError with 409 Conflict if the username is already in use.
+   * Registers a new user account.
    */
-  registerUser: async (input: RegisterInput): Promise<IUserDocument> => {
+  public async registerUser(input: RegisterUserDto): Promise<IUserDocument> {
     const { fullName, username, password } = input;
 
-    // Check if the username is already registered
-    const existingUser = await User.findOne({ username });
+    // Check if username is taken via Repository
+    const existingUser = await this.userRepo.findByUsername(username);
     if (existingUser) {
-      throw new AppError('Username already exists', 409); // Required by REST API spec pg 13
+      throw new AppError('Username already exists', HttpStatus.CONFLICT);
     }
 
-    // Save user. Password hashing is executed automatically via virtual set & pre-save hook
-    const user = new User({
-      fullName,
-      username,
-    });
-    user.password = password;
-    await user.save();
-
-    return user;
-  },
+    // Persist new user via Repository
+    return this.userRepo.create({ fullName, username, password });
+  }
 
   /**
-   * Validates user credentials and manages account lockout states.
-   * Throws a 401 AppError for credentials, or 429 for account lockout.
+   * Authenticates user credentials and manages lockout states.
    */
-  loginUser: async (input: LoginInput): Promise<IUserDocument> => {
+  public async loginUser(input: LoginUserDto): Promise<IUserDocument> {
     const { username, password } = input;
 
-    // 1. Fetch user by username, explicitly selecting the hidden password hash and lockout keys
-    const user = await User.findOne({ username }).select('+passwordHash');
-    
+    // Fetch user with password via Repository
+    const user = await this.userRepo.findByUsernameWithPassword(username);
     if (!user) {
-      throw new AppError('Invalid username or password', 401);
+      throw new AppError('Invalid username or password', HttpStatus.UNAUTHORIZED);
     }
 
-    // 2. Lockout Check: Check if user is currently locked out
+    // Lockout Check: Ensure user is not currently locked out
     if (user.lockoutUntil && user.lockoutUntil > new Date()) {
       const remainingTime = Math.ceil((user.lockoutUntil.getTime() - Date.now()) / 60000);
       throw new AppError(
         `Too many failed attempts. Account locked. Try again in ${remainingTime} minute(s).`,
-        429
+        HttpStatus.TOO_MANY_REQUESTS
       );
     }
 
-    // 3. Compare passwords
+    // Compare passwords
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
-      // Increment failed attempts
       user.failedLoginAttempts += 1;
 
-      // Check if threshold of 5 failed attempts is reached
+      // Lock account after 5 failed attempts for 15 minutes
       if (user.failedLoginAttempts >= 5) {
-        user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000); // 15-minute lockout
+        user.lockoutUntil = new Date(Date.now() + 15 * 60 * 1000);
       }
 
-      await user.save();
-      throw new AppError('Invalid username or password', 401);
+      await this.userRepo.save(user);
+      throw new AppError('Invalid username or password', HttpStatus.UNAUTHORIZED);
     }
 
-    // 4. Reset lockout counters on successful authentication
+    // Reset lockout counters on success
     if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
       user.failedLoginAttempts = 0;
       user.lockoutUntil = null;
-      await user.save();
+      await this.userRepo.save(user);
     }
 
     return user;
-  },
+  }
 
   /**
-   * Generates secure Access & Refresh tokens for a session and saves the refresh hash.
+   * Generates Access & Refresh JWTs and saves the hashed refresh token.
    */
-  generateAuthTokens: async (user: IUserDocument): Promise<TokenResult> => {
+  public async generateAuthTokens(user: IUserDocument): Promise<TokenResultDto> {
     const payload: TokenPayload = {
       userId: user._id.toString(),
       tokenVersion: user.tokenVersion,
@@ -114,91 +92,85 @@ export const AuthService = {
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    // Hash the refresh token before storing it in the database (defense-in-depth)
+    // Store hashed refresh token in database
     const saltRounds = 12;
     user.refreshTokenHash = await bcrypt.hash(refreshToken, saltRounds);
-    
-    await user.save();
+    await this.userRepo.save(user);
 
     return { accessToken, refreshToken };
-  },
+  }
 
   /**
-   * Refreshes access and refresh tokens.
-   * Employs Refresh Token Rotation (RTR) and detects token reuse (replay attacks).
+   * Refreshes session tokens implementing Refresh Token Rotation (RTR).
    */
-  refreshSession: async (
-    token: string
-  ): Promise<TokenResult & { user: IUserDocument }> => {
+  public async refreshSession(token: string): Promise<TokenResultDto & { user: IUserDocument }> {
     let payload: TokenPayload;
 
-    // 1. Verify Refresh Token signature and expiry
     try {
       payload = verifyRefreshToken(token);
-    } catch (err) {
-      throw new AppError('Invalid or expired refresh token', 401);
+    } catch {
+      throw new AppError('Invalid or expired refresh token', HttpStatus.UNAUTHORIZED);
     }
 
-    // 2. Fetch the user, selecting hidden tokenVersion and refreshTokenHash properties
-    const user = await User.findById(payload.userId).select(
-      '+refreshTokenHash +tokenVersion'
-    );
-
+    // Fetch user via Repository
+    const user = await this.userRepo.findByIdWithSessionKeys(payload.userId);
     if (!user) {
-      throw new AppError('User session not found', 401);
+      throw new AppError('User session not found', HttpStatus.UNAUTHORIZED);
     }
 
-    // 3. Verify Token Version (e.g. if incremented on logout/password changes)
     if (user.tokenVersion !== payload.tokenVersion) {
-      throw new AppError('Session version is invalid', 401);
+      throw new AppError('Session version is invalid', HttpStatus.UNAUTHORIZED);
     }
 
-    // 4. If user's stored refresh token hash is missing, logout has already cleared it
     if (!user.refreshTokenHash) {
-      throw new AppError('Session has been revoked', 401);
+      throw new AppError('Session has been revoked', HttpStatus.UNAUTHORIZED);
     }
 
-    // 5. Compare the incoming refresh token against the stored hash
     const isMatch = await bcrypt.compare(token, user.refreshTokenHash);
 
-    // Replay Attack Detection: If token does not match, it has already been used and rotated
+    // Replay Attack Detection: If token hash does not match, revoke all sessions
     if (!isMatch) {
-      // Invalidate ALL sessions for this user everywhere
       user.tokenVersion += 1;
       user.refreshTokenHash = null;
-      await user.save();
-      throw new AppError('Compromised session detected. Logged out everywhere.', 401);
+      await this.userRepo.save(user);
+      throw new AppError(
+        'Compromised session detected. Logged out everywhere.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
-    // 6. Token Rotation: Generate new Access and Refresh tokens
-    const tokens = await AuthService.generateAuthTokens(user);
+    // Rotate tokens
+    const tokens = await this.generateAuthTokens(user);
 
     return {
       ...tokens,
       user,
     };
-  },
+  }
 
   /**
-   * Logs out the user by incrementing token version and clearing database hashes.
+   * Invalidates active user session by incrementing token version.
    */
-  logoutUser: async (userId: string): Promise<void> => {
-    const user = await User.findById(userId);
+  public async logoutUser(userId: string): Promise<void> {
+    const user = await this.userRepo.findById(userId);
     if (user) {
-      user.tokenVersion += 1; // Invalidates all current access and refresh tokens in circulation
-      user.refreshTokenHash = null; // Clear active session refresh hash
-      await user.save();
+      user.tokenVersion += 1;
+      user.refreshTokenHash = null;
+      await this.userRepo.save(user);
     }
-  },
+  }
 
   /**
-   * Retrieves user profile details by ID.
+   * Fetches user profile by ID.
    */
-  getUserProfile: async (userId: string): Promise<IUserDocument> => {
-    const user = await User.findById(userId);
+  public async getUserProfile(userId: string): Promise<IUserDocument> {
+    const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new AppError('User not found', 404);
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
     }
     return user;
   }
-};
+}
+
+// Export singleton service instance
+export const authService = new AuthService();

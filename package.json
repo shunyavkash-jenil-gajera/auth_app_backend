@@ -9,13 +9,14 @@
     "start": "node dist/server.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
   },
   "keywords": [],
   "author": "Shunyavkash Pvt Ltd",
   "license": "ISC",
   "description": "Backend authentication service built with Node.js, Express, TypeScript and MongoDB",
-  
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -29,16 +30,25 @@
     "morgan": "^1.11.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^26.1.2",
+    "@types/supertest": "^7.2.1",
     "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.5.1",
+    "mongodb-memory-server": "^11.2.0",
     "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12",
     "tsx": "^4.23.5",
-    "typescript": "^7.0.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.69.0"
   }
 }

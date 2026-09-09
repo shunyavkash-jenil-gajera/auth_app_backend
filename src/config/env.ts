@@ -1,11 +1,12 @@
 import dotenv from 'dotenv';
+import { Environment } from '../constants/environment.enum.js';
 
 // Load variables from .env file
 dotenv.config();
 
 // Define a strict TypeScript interface for our validated configurations
 interface Config {
-  NODE_ENV: 'development' | 'production' | 'test';
+  NODE_ENV: Environment;
   PORT: number;
   MONGO_URI: string;
   JWT_SECRET: string;
@@ -26,7 +27,7 @@ const getRequiredEnv = (key: string): string => {
 
 // Validate and construct config object
 export const config: Config = {
-  NODE_ENV: (process.env.NODE_ENV as Config['NODE_ENV']) || 'development',
+  NODE_ENV: (process.env.NODE_ENV as Environment) || Environment.DEVELOPMENT,
   PORT: parseInt(process.env.PORT || '8000', 10),
   MONGO_URI: getRequiredEnv('MONGO_URI'),
   JWT_SECRET: getRequiredEnv('JWT_SECRET'),

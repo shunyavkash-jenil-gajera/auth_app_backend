@@ -27,7 +27,7 @@ startServer();
 // 2. Unhandled Promise Rejection Handler
 process.on('unhandledRejection', (err: unknown) => {
   logger.error('UNHANDLED REJECTION! Shutting down server gracefully...', err);
-  
+
   // Close HTTP server, disconnect MongoDB, then exit
   server.close(async () => {
     await closeDB();

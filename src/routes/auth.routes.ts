@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, logout, refresh, getMe } from '../controllers/auth.controller.js';
+import { register, login, logout, refresh } from '../controllers/auth.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { validateRegister, validateLogin } from '../middleware/validator.middleware.js';
 
@@ -12,6 +12,6 @@ router.post('/refresh', refresh);
 
 // Protected routes
 router.post('/logout', protect, logout);
-router.get('/me', protect, getMe);
+// router.get('/me', protect, getMe);
 
 export default router;

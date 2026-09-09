@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import type { CookieOptions } from 'express';
 import { config } from '../config/env.js';
+import { Environment } from '../constants/environment.enum.js';
 
 export interface TokenPayload {
   userId: string;
@@ -12,7 +13,7 @@ export interface TokenPayload {
  */
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.JWT_SECRET, {
-    expiresIn: '10m', // 10 minutes as per design doc pg 4
+    expiresIn: '10m',
   });
 };
 
@@ -21,12 +22,12 @@ export const generateAccessToken = (payload: TokenPayload): string => {
  */
 export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.JWT_REFRESH_SECRET, {
-    expiresIn: '7d', // 7 days as per design doc pg 4
+    expiresIn: '7d',
   });
 };
 
 /**
-Verifies an access token signature and parses its payload.
+ * Verifies an access token signature and parses its payload.
  */
 export const verifyAccessToken = (token: string): TokenPayload => {
   return jwt.verify(token, config.JWT_SECRET) as TokenPayload;
@@ -40,20 +41,17 @@ export const verifyRefreshToken = (token: string): TokenPayload => {
 };
 
 /**
- * Generates cookie configurations matching the security specifications:
- * HttpOnly, Secure, SameSite=Strict.
+ * Generates cookie configurations.
  */
 export const getCookieOptions = (maxAgeMs: number): CookieOptions => {
   return {
     httpOnly: true,
-    secure: config.NODE_ENV === 'production', // Enforce secure HTTPS in production
-    sameSite: 'strict', // Protects against CSRF attacks
+    secure: config.NODE_ENV === Environment.PRODUCTION,
+    sameSite: 'strict',
     maxAge: maxAgeMs,
-    path: '/', // Ensure cookie is accessible across the entire application domain
+    path: '/',
   };
 };
 
-// Access token cookie maximum lifetime is 10 minutes in ms
 export const ACCESS_TOKEN_MAX_AGE = 10 * 60 * 1000;
-// Refresh token cookie maximum lifetime is 7 days in ms
 export const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000;

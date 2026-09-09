@@ -2,13 +2,25 @@ import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/appError.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/env.js';
+import { HttpStatus } from '../constants/http-status.enum.js';
+import { Environment } from '../constants/environment.enum.js';
+
+interface AppMiddlewareError extends Error {
+  statusCode?: number;
+  status?: string;
+  isOperational?: boolean;
+  code?: number;
+  path?: string;
+  errors?: Record<string, { message: string }>;
+}
 
 /**
- * Formats and sends verbose error details for local development environments.
+ * Formats and sends verbose error details for development environment.
  */
-const sendErrorDev = (err: any, res: Response): void => {
-  res.status(err.statusCode || 500).json({
-    code: err.statusCode || 500,
+const sendErrorDev = (err: AppMiddlewareError, res: Response): void => {
+  const statusCode = err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+  res.status(statusCode).json({
+    code: statusCode,
     success: false,
     message: err.message,
     error: err,
@@ -17,13 +29,11 @@ const sendErrorDev = (err: any, res: Response): void => {
 };
 
 /**
- * Formats and sends clean, restricted messages for production environments.
- * Prevents system details and database logs from leaking.
+ * Formats and sends clean, restricted messages for production environment.
  */
-const sendErrorProd = (err: any, res: Response): void => {
-  // 1. Operational, trusted error: send user-friendly message to client
+const sendErrorProd = (err: AppMiddlewareError, res: Response): void => {
   if (err.isOperational) {
-    res.status(err.statusCode).json({
+    res.status(err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR).json({
       code: err.statusCode,
       success: false,
       message: err.message,
@@ -31,62 +41,56 @@ const sendErrorProd = (err: any, res: Response): void => {
     return;
   }
 
-  // 2. Unknown or programming error: don't leak details. Send general alert.
   logger.error('PRODUCTION PROGRAMMING ERROR:', err);
-  
-  res.status(500).json({
-    code: 500,
+
+  res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+    code: HttpStatus.INTERNAL_SERVER_ERROR,
     success: false,
-    message: 'Something went wrong, please try again', // Exact string required by Spec pg 13
+    message: 'Something went wrong, please try again',
   });
 };
 
-/**
- * Translates Mongoose/MongoDB database validation errors into standard operational errors.
- */
-const handleCastErrorDB = (err: any): AppError => {
-  return new AppError(`Invalid value for path: ${err.path}`, 400);
+const handleCastErrorDB = (err: AppMiddlewareError): AppError => {
+  return new AppError(`Invalid value for path: ${err.path}`, HttpStatus.BAD_REQUEST);
 };
 
 const handleDuplicateKeyErrorDB = (): AppError => {
-  // The only unique constraint in our design doc is username
-  return new AppError('Username already exists', 409); // Required by Spec pg 13
+  return new AppError('Username already exists', HttpStatus.CONFLICT);
 };
 
-const handleValidationErrorDB = (err: any): AppError => {
-  const errors = Object.values(err.errors).map((el: any) => el.message);
-  return new AppError(`Validation failure: ${errors.join('. ')}`, 422);
+const handleValidationErrorDB = (err: AppMiddlewareError): AppError => {
+  const errors = err.errors ? Object.values(err.errors).map((el) => el.message) : [];
+  return new AppError(`Validation failure: ${errors.join('. ')}`, HttpStatus.UNPROCESSABLE_ENTITY);
 };
 
 const handleJWTError = (): AppError => {
-  return new AppError('Invalid token. Please log in again.', 401);
+  return new AppError('Invalid token. Please log in again.', HttpStatus.UNAUTHORIZED);
 };
 
 const handleJWTExpiredError = (): AppError => {
-  return new AppError('Session expired. Please log in again.', 401);
+  return new AppError('Session expired. Please log in again.', HttpStatus.UNAUTHORIZED);
 };
 
 /**
  * Express Global Error Handling Middleware.
  */
 export const globalErrorHandler = (
-  err: any,
+  err: AppMiddlewareError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
-  err.statusCode = err.statusCode || 500;
+  err.statusCode = err.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
   err.status = err.status || 'error';
 
-  if (config.NODE_ENV === 'development') {
+  if (config.NODE_ENV === Environment.DEVELOPMENT) {
     sendErrorDev(err, res);
   } else {
     let error = { ...err };
     error.message = err.message;
-    error.isOperational = err.isOperational;
+    error.isOperational = err.isOperational ?? false;
     error.statusCode = err.statusCode;
 
-    // Handle database/MongoDB specific failures cleanly
     if (err.name === 'CastError') error = handleCastErrorDB(error);
     if (err.code === 11000) error = handleDuplicateKeyErrorDB();
     if (err.name === 'ValidationError') error = handleValidationErrorDB(err);

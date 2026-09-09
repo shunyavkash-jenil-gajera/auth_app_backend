@@ -1,13 +1,13 @@
 import type { Response, NextFunction } from 'express';
 import { AppError } from '../utils/appError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
-import { User } from '../models/user.js';
+import { userRepository } from '../repositories/user.repository.js';
+import { HttpStatus } from '../constants/http-status.enum.js';
+import { Environment } from '../constants/environment.enum.js';
 import type { AuthenticatedRequest } from '../controllers/auth.controller.js';
 
 /**
  * Authorization Guard Middleware.
- * Intercepts requests on protected endpoints, decodes the JWT access cookie,
- * checks token version validity, and attaches the user details to the request.
  */
 export const protect = async (
   req: AuthenticatedRequest,
@@ -15,50 +15,51 @@ export const protect = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // 1. Extract Access Token from cookies
     const token = req.cookies.accessToken;
 
     if (!token) {
-      throw new AppError('You are not logged in. Please log in to get access.', 401);
+      throw new AppError(
+        'You are not logged in. Please log in to get access.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
-    // 2. Verify token signature and expiry
     let decoded;
     try {
       decoded = verifyAccessToken(token);
-    } catch (err) {
-      // Security hygiene: clear corrupted or expired token cookies immediately
+    } catch {
       const clearOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === Environment.PRODUCTION,
         sameSite: 'strict' as const,
         path: '/',
       };
       res.clearCookie('accessToken', clearOptions);
-      throw new AppError('Invalid or expired authentication session', 401);
+      throw new AppError('Invalid or expired authentication session', HttpStatus.UNAUTHORIZED);
     }
 
-    // 3. Retrieve user from the database, explicitly fetching the tokenVersion
-    const currentUser = await User.findById(decoded.userId).select('+tokenVersion');
+    // Use Repository Pattern for user lookup
+    const currentUser = await userRepository.findByIdWithSessionKeys(decoded.userId);
 
     if (!currentUser) {
-      throw new AppError('The user belonging to this session no longer exists.', 401);
+      throw new AppError(
+        'The user belonging to this session no longer exists.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
-    // 4. Verify token version matches user's current version (handles logout and RTR)
     if (currentUser.tokenVersion !== decoded.tokenVersion) {
       const clearOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === Environment.PRODUCTION,
         sameSite: 'strict' as const,
         path: '/',
       };
       res.clearCookie('accessToken', clearOptions);
       res.clearCookie('refreshToken', clearOptions);
-      throw new AppError('Session has expired. Please log in again.', 401);
+      throw new AppError('Session has expired. Please log in again.', HttpStatus.UNAUTHORIZED);
     }
 
-    // 5. Grant Access: Attach the verified credentials payload to the request
     req.user = {
       id: currentUser._id.toString(),
       tokenVersion: currentUser.tokenVersion,

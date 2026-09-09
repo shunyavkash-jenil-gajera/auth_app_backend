@@ -16,11 +16,6 @@ export class AppError extends Error {
     this.isOperational = true;
 
     // Capture the call stack trace and exclude this constructor from it
-    Error.captureStackTrace(this.target, this.constructor);
-  }
-
-  // Helper getter because typescript compiler options can sometimes restrict target checking
-  private get target(): Object {
-    return this;
+    Error.captureStackTrace(this, this.constructor);
   }
 }

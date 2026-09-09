@@ -96,9 +96,7 @@ userSchema.pre('validate', async function () {
 });
 
 // 6. Instance Method: Safely verify login passwords using constant-time comparison
-userSchema.methods.comparePassword = async function (
-  candidatePassword: string
-): Promise<boolean> {
+userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   // 'this.passwordHash' is only available if explicitly selected in queries
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
