@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, logout, refresh, getMe } from '../controllers/auth.controller.js';
+import { register, login, logout, refresh } from '../controllers/auth.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { validateRegister, validateLogin } from '../middleware/validator.middleware.js';
 import {
@@ -18,6 +18,5 @@ router.post('/refresh', requireTrustedOrigin, refreshRateLimiter, refresh);
 
 // Protected routes
 router.post('/logout', requireTrustedOrigin, protect, logout);
-router.get('/me', protect, getMe);
 
 export default router;

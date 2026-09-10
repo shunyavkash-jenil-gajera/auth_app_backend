@@ -25,6 +25,12 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     }
 
     const newUser = await authService.registerUser({ fullName, username, password });
+    const { accessToken, refreshToken } = await authService.generateAuthTokens(newUser);
+
+    // A newly registered user starts an authenticated session immediately.
+    res.cookie('accessToken', accessToken, getCookieOptions(ACCESS_TOKEN_MAX_AGE));
+    res.cookie('refreshToken', refreshToken, getCookieOptions(REFRESH_TOKEN_MAX_AGE));
+
     const userDto = UserMapper.toResponseDto(newUser);
 
     SendResponse(res, HttpStatus.CREATED, true, 'User registered successfully', { user: userDto });
@@ -119,30 +125,6 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
       res.clearCookie('refreshToken', clearOptions);
       throw err;
     }
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * Controller: Retrieve current user profile.
- */
-export const getMe = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    if (!req.user) {
-      throw new AppError('User not authenticated', HttpStatus.UNAUTHORIZED);
-    }
-
-    const user = await authService.getUserProfile(req.user.id);
-    const userDto = UserMapper.toResponseDto(user);
-
-    SendResponse(res, HttpStatus.OK, true, 'User profile retrieved successfully', {
-      user: userDto,
-    });
   } catch (err) {
     next(err);
   }

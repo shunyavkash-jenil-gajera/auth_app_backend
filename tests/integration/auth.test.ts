@@ -48,6 +48,14 @@ describe('Authentication API Integration Tests', () => {
       expect(res.body.message).toBe('User registered successfully');
       expect(res.body.data.user.fullName).toBe(validUser.fullName);
       expect(res.body.data.user.username).toBe(validUser.username);
+
+      const cookies = res.get('Set-Cookie') || [];
+      expect(cookies.some((cookie) => cookie.includes('accessToken='))).toBe(true);
+      expect(cookies.some((cookie) => cookie.includes('refreshToken='))).toBe(true);
+
+      const welcomeRes = await request(app).get('/api/v1/dashboard').set('Cookie', cookies);
+      expect(welcomeRes.status).toBe(200);
+      expect(welcomeRes.body.data.username).toBe(validUser.username);
     });
 
     it('should reject registration if username is already taken (409 Conflict)', async () => {
@@ -75,7 +83,7 @@ describe('Authentication API Integration Tests', () => {
     });
   });
 
-  describe('POST /api/v1/auth/login, /me, /refresh, /logout & /dashboard', () => {
+  describe('POST /api/v1/auth/login, /refresh, /logout & GET /dashboard', () => {
     const userCredentials = {
       fullName: 'Jenil Gajera',
       username: 'jenil38',
@@ -112,7 +120,7 @@ describe('Authentication API Integration Tests', () => {
       expect(res.body.message).toBe('Invalid username or password');
     });
 
-    it('should allow access to /me and /dashboard with valid cookies', async () => {
+    it('should allow access to /dashboard with valid cookies', async () => {
       const loginRes = await request(app).post('/api/v1/auth/login').send({
         username: userCredentials.username,
         password: userCredentials.password,
@@ -121,13 +129,6 @@ describe('Authentication API Integration Tests', () => {
 
       const cookies = loginRes.get('Set-Cookie') || [];
 
-      // Test GET /api/v1/auth/me
-      const meRes = await request(app).get('/api/v1/auth/me').set('Cookie', cookies);
-
-      expect(meRes.status).toBe(200);
-      expect(meRes.body.data.user.username).toBe(userCredentials.username);
-
-      // Test GET /api/v1/dashboard
       const dashboardRes = await request(app).get('/api/v1/dashboard').set('Cookie', cookies);
 
       expect(dashboardRes.status).toBe(200);
