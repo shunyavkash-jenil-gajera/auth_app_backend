@@ -127,23 +127,23 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
 /**
  * Controller: Retrieve current user profile.
  */
-// export const getMe = async (
-//   req: AuthenticatedRequest,
-//   res: Response,
-//   next: NextFunction
-// ): Promise<void> => {
-//   try {
-//     if (!req.user) {
-//       throw new AppError('User not authenticated', HttpStatus.UNAUTHORIZED);
-//     }
+export const getMe = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new AppError('User not authenticated', HttpStatus.UNAUTHORIZED);
+    }
 
-//     const user = await authService.getUserProfile(req.user.id);
-//     const userDto = UserMapper.toResponseDto(user);
+    const user = await authService.getUserProfile(req.user.id);
+    const userDto = UserMapper.toResponseDto(user);
 
-//     SendResponse(res, HttpStatus.OK, true, 'User profile retrieved successfully', {
-//       user: userDto,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
+    SendResponse(res, HttpStatus.OK, true, 'User profile retrieved successfully', {
+      user: userDto,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

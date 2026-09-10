@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import type { CookieOptions } from 'express';
 import { config } from '../config/env.js';
 import { Environment } from '../constants/environment.enum.js';
@@ -13,7 +14,10 @@ export interface TokenPayload {
  */
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.JWT_SECRET, {
-    expiresIn: '10m',
+    algorithm: 'HS256',
+    expiresIn: config.JWT_EXPIRES_IN as NonNullable<SignOptions['expiresIn']>,
+    issuer: config.JWT_ISSUER,
+    audience: config.JWT_AUDIENCE,
   });
 };
 
@@ -22,7 +26,10 @@ export const generateAccessToken = (payload: TokenPayload): string => {
  */
 export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.JWT_REFRESH_SECRET, {
-    expiresIn: '7d',
+    algorithm: 'HS256',
+    expiresIn: config.JWT_REFRESH_EXPIRES_IN as NonNullable<SignOptions['expiresIn']>,
+    issuer: config.JWT_ISSUER,
+    audience: config.JWT_AUDIENCE,
   });
 };
 
@@ -30,14 +37,22 @@ export const generateRefreshToken = (payload: TokenPayload): string => {
  * Verifies an access token signature and parses its payload.
  */
 export const verifyAccessToken = (token: string): TokenPayload => {
-  return jwt.verify(token, config.JWT_SECRET) as TokenPayload;
+  return jwt.verify(token, config.JWT_SECRET, {
+    algorithms: ['HS256'],
+    issuer: config.JWT_ISSUER,
+    audience: config.JWT_AUDIENCE,
+  }) as TokenPayload;
 };
 
 /**
  * Verifies a refresh token signature and parses its payload.
  */
 export const verifyRefreshToken = (token: string): TokenPayload => {
-  return jwt.verify(token, config.JWT_REFRESH_SECRET) as TokenPayload;
+  return jwt.verify(token, config.JWT_REFRESH_SECRET, {
+    algorithms: ['HS256'],
+    issuer: config.JWT_ISSUER,
+    audience: config.JWT_AUDIENCE,
+  }) as TokenPayload;
 };
 
 /**
@@ -53,5 +68,20 @@ export const getCookieOptions = (maxAgeMs: number): CookieOptions => {
   };
 };
 
-export const ACCESS_TOKEN_MAX_AGE = 10 * 60 * 1000;
-export const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const durationToMilliseconds = (duration: string): number => {
+  const match = /^(\d+)\s*(ms|s|m|h|d|w|y)?$/i.exec(duration.trim());
+  if (!match) throw new Error('JWT expiry must be a positive duration such as 15m or 7d');
+  const multipliers: Record<string, number> = {
+    ms: 1,
+    s: 1000,
+    m: 60000,
+    h: 3600000,
+    d: 86400000,
+    w: 604800000,
+    y: 31536000000,
+  };
+  return Number(match[1]) * multipliers[match[2]?.toLowerCase() || 's']!;
+};
+
+export const ACCESS_TOKEN_MAX_AGE = durationToMilliseconds(config.JWT_EXPIRES_IN);
+export const REFRESH_TOKEN_MAX_AGE = durationToMilliseconds(config.JWT_REFRESH_EXPIRES_IN);

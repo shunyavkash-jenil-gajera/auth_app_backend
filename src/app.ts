@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { config } from './config/env.js';
 import { Environment } from './constants/environment.enum.js';
 import { HttpStatus } from './constants/http-status.enum.js';
+import { apiRateLimiter } from './middleware/rate-limit.middleware.js';
 
 const app = express();
 
@@ -30,6 +31,7 @@ if (config.NODE_ENV === Environment.DEVELOPMENT) {
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
+app.use('/api', apiRateLimiter);
 
 // 5. Health Check Endpoint
 app.get('/health', (_req, res) => {

@@ -27,7 +27,7 @@ export class AuthService {
     // Check if username is taken via Repository
     const existingUser = await this.userRepo.findByUsername(username);
     if (existingUser) {
-      throw new AppError('Username already exists', HttpStatus.CONFLICT);
+      throw new AppError('Unable to register with those details', HttpStatus.CONFLICT);
     }
 
     // Persist new user via Repository
