@@ -55,7 +55,7 @@ const handleCastErrorDB = (err: AppMiddlewareError): AppError => {
 };
 
 const handleDuplicateKeyErrorDB = (): AppError => {
-  return new AppError('Unable to register with those details', HttpStatus.CONFLICT);
+  return new AppError('This username is already taken. Please choose another username.', HttpStatus.CONFLICT);
 };
 
 const handleValidationErrorDB = (err: AppMiddlewareError): AppError => {

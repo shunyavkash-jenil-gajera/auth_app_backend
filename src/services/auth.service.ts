@@ -27,7 +27,7 @@ export class AuthService {
     // Check if username is taken via Repository
     const existingUser = await this.userRepo.findByUsername(username);
     if (existingUser) {
-      throw new AppError('Unable to register with those details', HttpStatus.CONFLICT);
+      throw new AppError('This username is already taken. Please choose another username.', HttpStatus.CONFLICT);
     }
 
     // Persist new user via Repository
@@ -43,7 +43,7 @@ export class AuthService {
     // Fetch user with password via Repository
     const user = await this.userRepo.findByUsernameWithPassword(username);
     if (!user) {
-      throw new AppError('Invalid username or password', HttpStatus.UNAUTHORIZED);
+      throw new AppError('No account found with this username. Please register first.', HttpStatus.UNAUTHORIZED);
     }
 
     // Lockout Check: Ensure user is not currently locked out
@@ -67,7 +67,7 @@ export class AuthService {
       }
 
       await this.userRepo.save(user);
-      throw new AppError('Invalid username or password', HttpStatus.UNAUTHORIZED);
+      throw new AppError('The password you entered is incorrect.', HttpStatus.UNAUTHORIZED);
     }
 
     // Reset lockout counters on success
@@ -109,21 +109,21 @@ export class AuthService {
     try {
       payload = verifyRefreshToken(token);
     } catch {
-      throw new AppError('Invalid or expired refresh token', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session has expired. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     // Fetch user via Repository
     const user = await this.userRepo.findByIdWithSessionKeys(payload.userId);
     if (!user) {
-      throw new AppError('User session not found', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session is no longer available. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     if (user.tokenVersion !== payload.tokenVersion) {
-      throw new AppError('Session version is invalid', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session is no longer valid. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     if (!user.refreshTokenHash) {
-      throw new AppError('Session has been revoked', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session has ended. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     const isMatch = await bcrypt.compare(token, user.refreshTokenHash);

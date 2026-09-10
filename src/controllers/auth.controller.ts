@@ -102,7 +102,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
-      throw new AppError('No refresh token provided', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session has expired. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     try {

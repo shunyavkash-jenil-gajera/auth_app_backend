@@ -19,7 +19,7 @@ export const protect = async (
 
     if (!token) {
       throw new AppError(
-        'You are not logged in. Please log in to get access.',
+        'Please sign in to access this page.',
         HttpStatus.UNAUTHORIZED
       );
     }
@@ -35,7 +35,7 @@ export const protect = async (
         path: '/',
       };
       res.clearCookie('accessToken', clearOptions);
-      throw new AppError('Invalid or expired authentication session', HttpStatus.UNAUTHORIZED);
+      throw new AppError('Your session has expired. Please sign in again.', HttpStatus.UNAUTHORIZED);
     }
 
     // Use Repository Pattern for user lookup

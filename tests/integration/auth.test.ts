@@ -65,7 +65,7 @@ describe('Authentication API Integration Tests', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
-      expect(res.body.message).toBe('Unable to register with those details');
+      expect(res.body.message).toBe('This username is already taken. Please choose another username.');
     });
 
     it('should reject invalid password format (422 Unprocessable Entity)', async () => {
@@ -109,7 +109,7 @@ describe('Authentication API Integration Tests', () => {
       expect(cookies.some((c) => c.includes('refreshToken='))).toBe(true);
     });
 
-    it('should reject incorrect password with generic error message (401 Unauthorized)', async () => {
+    it('should explain when the password is incorrect (401 Unauthorized)', async () => {
       const res = await request(app).post('/api/v1/auth/login').send({
         username: userCredentials.username,
         password: 'WrongPassword123!',
@@ -117,7 +117,17 @@ describe('Authentication API Integration Tests', () => {
 
       expect(res.status).toBe(401);
       expect(res.body.success).toBe(false);
-      expect(res.body.message).toBe('Invalid username or password');
+      expect(res.body.message).toBe('The password you entered is incorrect.');
+    });
+
+    it('should explain when the username is not registered (401 Unauthorized)', async () => {
+      const res = await request(app).post('/api/v1/auth/login').send({
+        username: 'not_registered_user',
+        password: userCredentials.password,
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.message).toBe('No account found with this username. Please register first.');
     });
 
     it('should allow access to /dashboard with valid cookies', async () => {
