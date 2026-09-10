@@ -18,10 +18,7 @@ export const protect = async (
     const token = req.cookies.accessToken;
 
     if (!token) {
-      throw new AppError(
-        'Please sign in to access this page.',
-        HttpStatus.UNAUTHORIZED
-      );
+      throw new AppError('Please sign in to access this page.', HttpStatus.UNAUTHORIZED);
     }
 
     let decoded;
@@ -35,7 +32,10 @@ export const protect = async (
         path: '/',
       };
       res.clearCookie('accessToken', clearOptions);
-      throw new AppError('Your session has expired. Please sign in again.', HttpStatus.UNAUTHORIZED);
+      throw new AppError(
+        'Your session has expired. Please sign in again.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     // Use Repository Pattern for user lookup

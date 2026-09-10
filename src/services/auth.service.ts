@@ -27,7 +27,10 @@ export class AuthService {
     // Check if username is taken via Repository
     const existingUser = await this.userRepo.findByUsername(username);
     if (existingUser) {
-      throw new AppError('This username is already taken. Please choose another username.', HttpStatus.CONFLICT);
+      throw new AppError(
+        'This username is already taken. Please choose another username.',
+        HttpStatus.CONFLICT
+      );
     }
 
     // Persist new user via Repository
@@ -43,7 +46,10 @@ export class AuthService {
     // Fetch user with password via Repository
     const user = await this.userRepo.findByUsernameWithPassword(username);
     if (!user) {
-      throw new AppError('No account found with this username. Please register first.', HttpStatus.UNAUTHORIZED);
+      throw new AppError(
+        'No account found with this username. Please register first.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     // Lockout Check: Ensure user is not currently locked out
@@ -109,17 +115,26 @@ export class AuthService {
     try {
       payload = verifyRefreshToken(token);
     } catch {
-      throw new AppError('Your session has expired. Please sign in again.', HttpStatus.UNAUTHORIZED);
+      throw new AppError(
+        'Your session has expired. Please sign in again.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     // Fetch user via Repository
     const user = await this.userRepo.findByIdWithSessionKeys(payload.userId);
     if (!user) {
-      throw new AppError('Your session is no longer available. Please sign in again.', HttpStatus.UNAUTHORIZED);
+      throw new AppError(
+        'Your session is no longer available. Please sign in again.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     if (user.tokenVersion !== payload.tokenVersion) {
-      throw new AppError('Your session is no longer valid. Please sign in again.', HttpStatus.UNAUTHORIZED);
+      throw new AppError(
+        'Your session is no longer valid. Please sign in again.',
+        HttpStatus.UNAUTHORIZED
+      );
     }
 
     if (!user.refreshTokenHash) {

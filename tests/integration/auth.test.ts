@@ -65,7 +65,9 @@ describe('Authentication API Integration Tests', () => {
 
       expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
-      expect(res.body.message).toBe('This username is already taken. Please choose another username.');
+      expect(res.body.message).toBe(
+        'This username is already taken. Please choose another username.'
+      );
     });
 
     it('should reject invalid password format (422 Unprocessable Entity)', async () => {
@@ -91,7 +93,12 @@ describe('Authentication API Integration Tests', () => {
     };
 
     beforeEach(async () => {
-      await request(app).post('/api/v1/auth/register').send(userCredentials);
+      const user = new User({
+        fullName: userCredentials.fullName,
+        username: userCredentials.username,
+      });
+      user.password = userCredentials.password;
+      await user.save();
     });
 
     it('should successfully login and attach HttpOnly cookies (200 OK)', async () => {

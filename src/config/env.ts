@@ -83,7 +83,7 @@ export const config: Config = {
   PORT: getPort(),
   MONGO_URI: getMongoUri(),
   JWT_SECRET: getSecret('JWT_SECRET'),
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '15m',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '10m',
   JWT_REFRESH_SECRET: getSecret('JWT_REFRESH_SECRET'),
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   JWT_ISSUER: process.env.JWT_ISSUER || 'auth-app',

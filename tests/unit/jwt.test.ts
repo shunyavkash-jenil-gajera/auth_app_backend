@@ -3,7 +3,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   verifyAccessToken,
-  verifyRefreshToken
+  verifyRefreshToken,
 } from '../../src/utils/jwt.js';
 
 describe('JWT Utility Unit Tests', () => {

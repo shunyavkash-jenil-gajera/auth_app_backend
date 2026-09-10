@@ -70,7 +70,7 @@ export const getCookieOptions = (maxAgeMs: number): CookieOptions => {
 
 const durationToMilliseconds = (duration: string): number => {
   const match = /^(\d+)\s*(ms|s|m|h|d|w|y)?$/i.exec(duration.trim());
-  if (!match) throw new Error('JWT expiry must be a positive duration such as 15m or 7d');
+  if (!match) throw new Error('JWT expiry must be a positive duration such as 10m or 7d');
   const multipliers: Record<string, number> = {
     ms: 1,
     s: 1000,
